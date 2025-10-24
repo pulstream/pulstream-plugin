@@ -1,5 +1,8 @@
 use crate::utils::{
-    instruction::{InstructionMetadata, InstructionsWithMetadata, TransactionMetadata},
+    instruction::{
+        InstructionMetadata, InstructionsWithMetadata, NestedInstruction, NestedInstructions,
+        TransactionMetadata,
+    },
     transformers::extract_instructions_with_metadata,
 };
 use carbon_core::instruction::InstructionDecoder;
@@ -56,6 +59,54 @@ impl PumpfunTrackingPlugin {
     pub fn with_processor(mint: Pubkey, processor: TradeEventProcessor) -> Self {
         Self { mint, processor }
     }
+
+    /// Recursively processes nested instructions to find and decode trade events
+    fn process(
+        &self,
+        nested_instruction: &NestedInstruction,
+        transaction_signature: &str,
+        transaction_slot: u64,
+        decoder: &PumpfunDecoder,
+    ) {
+        // Try to decode the current instruction
+        if let Some(decoded) = decoder.decode_instruction(&nested_instruction.instruction) {
+            match decoded.data {
+                PumpfunInstruction::TradeEvent(te) => {
+                    let (amount_in, amount_out) = if te.is_buy {
+                        (te.sol_amount, te.token_amount)
+                    } else {
+                        (te.token_amount, te.sol_amount)
+                    };
+
+                    let event = TradeEvent {
+                        metadata: &nested_instruction.metadata,
+                        signature: transaction_signature.to_string(),
+                        slot: transaction_slot,
+                        timestamp: te.timestamp,
+                        program_id: nested_instruction.instruction.program_id.to_string(),
+                        mint: te.mint.to_string(),
+                        payer: te.user.to_string(),
+                        amount_in,
+                        amount_out,
+                        is_buy: te.is_buy,
+                    };
+
+                    (self.processor)(&event);
+                }
+                _ => {}
+            }
+        }
+
+        // Recursively process all inner instructions
+        for inner_instruction in nested_instruction.inner_instructions.iter() {
+            self.process(
+                inner_instruction,
+                transaction_signature,
+                transaction_slot,
+                decoder,
+            );
+        }
+    }
 }
 
 impl Plugin for PumpfunTrackingPlugin {
@@ -106,36 +157,19 @@ impl Plugin for PumpfunTrackingPlugin {
                         &transaction.transaction_status_meta,
                     );
 
-                // Process each instruction
+                let nested_instructions: NestedInstructions = instructions_with_metadata.into();
+
+                // Process each instruction recursively
                 let decoder = PumpfunDecoder;
-                for (instruction_metadata, instruction) in instructions_with_metadata {
-                    if let Some(decoded) = decoder.decode_instruction(&instruction) {
-                        match decoded.data {
-                            PumpfunInstruction::TradeEvent(te) => {
-                                let (amount_in, amount_out) = if te.is_buy {
-                                    (te.sol_amount, te.token_amount)
-                                } else {
-                                    (te.token_amount, te.sol_amount)
-                                };
+                let signature_str = transaction.signature.to_string();
 
-                                let event = TradeEvent {
-                                    metadata: &instruction_metadata,
-                                    signature: transaction.signature.to_string(),
-                                    slot: transaction.slot,
-                                    timestamp: te.timestamp,
-                                    program_id: instruction.program_id.to_string(),
-                                    mint: te.mint.to_string(),
-                                    payer: te.user.to_string(),
-                                    amount_in,
-                                    amount_out,
-                                    is_buy: te.is_buy,
-                                };
-
-                                (self.processor)(&event);
-                            }
-                            _ => {}
-                        }
-                    }
+                for nested_instruction in nested_instructions.iter() {
+                    self.process(
+                        nested_instruction,
+                        &signature_str,
+                        transaction.slot,
+                        &decoder,
+                    );
                 }
             }
 

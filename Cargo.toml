@@ -58,3 +58,4 @@ pulstream-plugin.workspace = true
 serde_json.workspace = true
 solana-instruction.workspace = true
 solana-pubkey.workspace = true
+log.workspace = true

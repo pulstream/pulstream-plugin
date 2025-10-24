@@ -1,7 +1,5 @@
 use crate::utils::{
-    instruction::{
-        InstructionMetadata, InstructionsWithMetadata, NestedInstructions, TransactionMetadata,
-    },
+    instruction::{InstructionMetadata, InstructionsWithMetadata, TransactionMetadata},
     transformers::extract_instructions_with_metadata,
 };
 use carbon_core::instruction::InstructionDecoder;
@@ -89,6 +87,8 @@ impl Plugin for PumpfunTrackingPlugin {
             let mint_involved = account_keys.iter().any(|&key| key == mint);
 
             if mint_involved {
+                info!("Mint involved in transaction: {:?}", transaction.signature);
+
                 // Create TransactionMetadata from transaction data
                 let transaction_metadata = Arc::new(TransactionMetadata {
                     slot: transaction.slot,
@@ -106,35 +106,34 @@ impl Plugin for PumpfunTrackingPlugin {
                         &transaction.transaction_status_meta,
                     );
 
-                let nested_instructions: NestedInstructions = instructions_with_metadata.into();
-
                 // Process each instruction
                 let decoder = PumpfunDecoder;
-                for nested_instruction in nested_instructions {
-                    if let Some(decoded) =
-                        decoder.decode_instruction(&nested_instruction.instruction)
-                    {
-                        if let PumpfunInstruction::TradeEvent(te) = decoded.data {
-                            let (amount_in, amount_out) = if te.is_buy {
-                                (te.sol_amount, te.token_amount)
-                            } else {
-                                (te.token_amount, te.sol_amount)
-                            };
+                for (instruction_metadata, instruction) in instructions_with_metadata {
+                    if let Some(decoded) = decoder.decode_instruction(&instruction) {
+                        match decoded.data {
+                            PumpfunInstruction::TradeEvent(te) => {
+                                let (amount_in, amount_out) = if te.is_buy {
+                                    (te.sol_amount, te.token_amount)
+                                } else {
+                                    (te.token_amount, te.sol_amount)
+                                };
 
-                            let event = TradeEvent {
-                                metadata: &nested_instruction.metadata,
-                                signature: transaction.signature.to_string(),
-                                slot: transaction.slot,
-                                timestamp: te.timestamp,
-                                program_id: nested_instruction.instruction.program_id.to_string(),
-                                mint: te.mint.to_string(),
-                                payer: te.user.to_string(),
-                                amount_in,
-                                amount_out,
-                                is_buy: te.is_buy,
-                            };
+                                let event = TradeEvent {
+                                    metadata: &instruction_metadata,
+                                    signature: transaction.signature.to_string(),
+                                    slot: transaction.slot,
+                                    timestamp: te.timestamp,
+                                    program_id: instruction.program_id.to_string(),
+                                    mint: te.mint.to_string(),
+                                    payer: te.user.to_string(),
+                                    amount_in,
+                                    amount_out,
+                                    is_buy: te.is_buy,
+                                };
 
-                            (self.processor)(&event);
+                                (self.processor)(&event);
+                            }
+                            _ => {}
                         }
                     }
                 }

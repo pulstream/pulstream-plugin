@@ -4600,6 +4600,7 @@ name = "pulstream"
 version = "0.1.0"
 dependencies = [
  "jetstreamer",
+ "log",
  "pulstream-plugin",
  "serde_json",
  "solana-instruction 2.3.0",

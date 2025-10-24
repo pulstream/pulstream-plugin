@@ -1,5 +1,7 @@
+use std::sync::Arc;
+
 use jetstreamer::{firehose::epochs, JetstreamerRunner};
-use pulstream_plugin::plugins::pumpfun_tracking::PumpfunTrackingPlugin;
+use pulstream_plugin::plugins::pumpfun_tracking::{PumpfunTrackingPlugin, TradeEvent};
 use solana_pubkey::Pubkey;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -69,7 +71,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(mint) = mint_arg.as_deref() {
         let mint_pubkey = mint.parse::<Pubkey>()?;
-        let plugin = PumpfunTrackingPlugin::new(mint_pubkey);
+        let plugin = PumpfunTrackingPlugin::with_processor(
+            mint_pubkey,
+            Arc::new(|trade_event: &TradeEvent| {
+                log::info!(
+                    "Trade event:  Slot: {:?}, Signature: {:?}, Timestamp: {:?}, Program ID: {:?}, Mint: {:?}, Payer: {:?}, Amount In: {:?}, Amount Out: {:?}, Is Buy: {:?}",
+                    trade_event.slot,
+                    trade_event.signature,
+                    trade_event.timestamp,
+                    trade_event.program_id,
+                    trade_event.mint,
+                    trade_event.payer,
+                    trade_event.amount_in,
+                    trade_event.amount_out,
+                    trade_event.is_buy
+                );
+            }),
+        );
         runner = runner.with_plugin(Box::new(plugin));
     }
 

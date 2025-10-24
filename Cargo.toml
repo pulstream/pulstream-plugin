@@ -1,0 +1,60 @@
+[package]
+name = "pulstream"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+members = [
+    "pulstream-plugin",
+]
+
+[workspace.package]
+edition = "2021"
+keywords = []
+
+[workspace.dependencies]
+pulstream-plugin = { path = "pulstream-plugin", version = "0.1.0" }
+jetstreamer = "0.1"
+
+tokio = "1"
+futures-util = { version = "0", default-features = false }
+futures = "0"
+log = "0"
+serde = { version = "1", default-features = false }
+serde_json = { version = "1", default-features = false }
+thiserror = { version = "2", default-features = false }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+anyhow = { version = "1", default-features = false }
+base64 = "0.22"
+bincode = "1"
+bs58 = { version = "0", default-features = false }
+cbor = "0"
+cid = "0"
+colored = "2"
+const-hex = "1"
+crc = "3"
+async-trait = { version = "0.1.86" }
+crossbeam-channel = { version = "0", default-features = false }
+crossbeam-utils = { version = "0", default-features = false }
+clickhouse = { version = ">= 0.13", default-features = false }
+
+solana-entry = "3"
+solana-message = "3"
+solana-instruction = { version = "~2.3", default-features = false }
+solana-pubkey = "3"
+solana-pubkey-carbon = { version = "^2.3.6", features = ["serde", "borsh", "curve25519"], package="solana-pubkey" }
+solana-transaction = "3"
+solana-transaction-status = "3"
+solana-signature = { version = "3", default-features = false }
+solana-program = "3"
+
+carbon-core = "0.11.0"
+carbon-pumpfun-decoder = "0.11.0"
+
+
+[dependencies]
+jetstreamer.workspace = true
+pulstream-plugin.workspace = true
+serde_json.workspace = true
+solana-instruction.workspace = true
+solana-pubkey.workspace = true
